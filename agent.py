@@ -1,20 +1,23 @@
 import os
 import argparse
 import sys
-import time
+import json
 
 from dotenv import load_dotenv
 import openai
+import numpy as np
 from rich.console import Console
 from rich.panel import Panel
+
+from agent_tools import EmbeddingStore
 
 load_dotenv()
 console = Console()
 
 SYSTEM_PROMPT = (
     "You are PantryChef — a friendly assistant that suggests recipes, meal plans, and shopping lists "
-    "based on available ingredients. If the user asks for recipe details, include an ingredients list, "
-    "step-by-step instructions, estimated time, and any notes or substitutions. Keep responses concise and actionable."
+    "based on available ingredients and any supporting documents provided. When context is available, cite the source IDs. "
+    "Keep responses concise and actionable."
 )
 
 DEFAULT_MODEL = "gpt-3.5-turbo"
@@ -46,7 +49,7 @@ def call_chat(prompt, model=DEFAULT_MODEL, temperature=0.7, max_tokens=600):
         return None
 
 
-def interactive_loop(model):
+def interactive_loop(model, store=None, top_k=3):
     console.print(Panel("PantryChef — enter ingredients or commands. Type `/help` for commands."))
     history = []
     while True:
@@ -64,7 +67,7 @@ def interactive_loop(model):
             break
         if user == "/help":
             console.print(
-                "Commands:\n  /recipe <ingredients>  — request recipes for given comma-separated ingredients\n  /plan <days>           — create a meal plan for N days (use ingredients)\n  /shopping <items>      — expand to a shopping list\n  /exit                  — quit\nJust type your ingredients or a question to get started."
+                "Commands:\n  /recipe <ingredients>  — request recipes for given comma-separated ingredients\n  /plan <days>           — create a meal plan for N days (use ingredients)\n  /shopping <items>      — expand to a shopping list\n  /ingest <dir>          — ingest markdown docs from directory\n  /query <question>      — ask a question and use ingested docs for context\n  /exit                  — quit\nJust type your ingredients or a question to get started."
             )
             continue
 
@@ -78,6 +81,21 @@ def interactive_loop(model):
         elif user.startswith("/shopping "):
             items = user[len("/shopping "):].strip()
             prompt = f"Create a shopping list and approximate quantities for the following items or to make meals from a typical pantry: {items}. Group by sections (produce, dairy, pantry)."
+        elif user.startswith("/ingest "):
+            d = user[len("/ingest "):].strip()
+            store = EmbeddingStore()
+            store.ingest_dir(d)
+            store.save()
+            console.print(f"Ingested docs from {d} into {store.path}")
+            continue
+        elif user.startswith("/query "):
+            q = user[len("/query "):].strip()
+            if not store:
+                store = EmbeddingStore()
+                store.load()
+            ctx = store.query(q, top_k=top_k)
+            ctx_text = "\n\n".join([f"Source:{c['id']}\n{c['text']}" for c in ctx])
+            prompt = f"Use the following context documents to answer the question.\n\n{ctx_text}\n\nQuestion: {q}\n\nAnswer concisely and cite source IDs when relevant."
         else:
             # treat input as free-form ingredient list or question
             prompt = f"User input: {user}\n\nAct as a recipe recommender and provide helpful suggestions."
@@ -94,14 +112,42 @@ def cli_main():
     parser.add_argument("--model", default=DEFAULT_MODEL, help="OpenAI model to use (default: gpt-3.5-turbo)")
     parser.add_argument("--ingredients", "-i", help="One-line comma-separated ingredients to ask about")
     parser.add_argument("--interactive", "-r", action="store_true", help="Start interactive REPL")
+    parser.add_argument("--ingest", help="Ingest markdown docs from a directory into embeddings store")
+    parser.add_argument("--query", help="Query with local docs context (one-line question)")
+    parser.add_argument("--topk", type=int, default=3, help="Top-k docs to use for context")
     args = parser.parse_args()
 
     # ensure API key
     api_key = get_api_key()
     openai.api_key = api_key
 
+    if args.ingest:
+        store = EmbeddingStore()
+        store.ingest_dir(args.ingest)
+        store.save()
+        console.print(f"Ingested docs from {args.ingest} into {store.path}")
+        return
+
+    if args.query:
+        store = EmbeddingStore()
+        store.load()
+        ctx = store.query(args.query, top_k=args.topk)
+        ctx_text = "\n\n".join([f"Source:{c['id']}\n{c['text']}" for c in ctx])
+        prompt = f"Use the following context documents to answer the question.\n\n{ctx_text}\n\nQuestion: {args.query}\n\nAnswer concisely and cite source IDs when relevant."
+        console.print("[grey]Querying agent with local context...[/grey]")
+        answer = call_chat(prompt, model=args.model)
+        if answer:
+            console.print(Panel(answer, title="PantryChef"))
+        return
+
     if args.interactive:
-        interactive_loop(args.model)
+        # try to load store, but not required
+        try:
+            store = EmbeddingStore()
+            store.load()
+        except Exception:
+            store = None
+        interactive_loop(args.model, store=store, top_k=args.topk)
         return
 
     if args.ingredients:
