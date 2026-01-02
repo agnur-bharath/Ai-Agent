@@ -41,14 +41,6 @@ Customization
 - To change the model, pass `--model` (defaults to `gpt-3.5-turbo`).
 - You can extend `agent.py` to add embeddings, caching, or a vector index for a larger knowledge base.
 
-Next steps I can do for you
-
-- Add example unit tests or a simple integration test harness
-- Add embeddings-based local doc search (requires more dependencies & a small indexer)
-- Add Windows installer script or publish to PyPI
-
-If you'd like any of those, tell me which one and I'll continue.
-
 Ingesting docs, persistence, and tests
 
 - To ingest markdown docs into the local embedding store (creates `store.db`):
