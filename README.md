@@ -57,20 +57,60 @@ Ingesting docs, persistence, and tests
 python .\agent.py --ingest .\docs
 ```
 
+# PantryChef — Simple AI Agent
+
+PantryChef is a minimal CLI AI agent that suggests recipes, meal plans, and shopping lists based on available ingredients. It is a demonstration scaffold that integrates with the OpenAI API.
+
+Files
+
+- `agent.py` — main CLI and interactive REPL
+- `requirements.txt` — Python dependencies
+- `docs/` — sample recipe and documentation
+
+Quick setup (Windows PowerShell)
+
+```powershell
+# Create and activate a virtual environment
+python -m venv .venv; .\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set your OpenAI API key (PowerShell)
+$env:OPENAI_API_KEY = 'sk-REPLACE_WITH_YOURS'
+
+# Run interactive REPL
+python .\agent.py --interactive
+
+# Or run a one-off query with ingredients
+python .\agent.py --ingredients "eggs, milk, flour, tomato, onion"
+```
+
+Usage
+
+- `/recipe <ingredients>` — request recipes for given comma-separated ingredients
+- `/plan <days>` — create a meal plan for N days
+- `/shopping <items>` — create a shopping list from items
+- `/help` — show help
+- `/exit` or `/quit` — quit the REPL
+
+Customization
+
+- To change the model, pass `--model` (defaults to `gpt-3.5-turbo`).
+- The agent can be extended with embeddings, caching, or a vector index for larger datasets.
+
+Ingesting docs, persistence, and tests
+
+- Ingest markdown docs into the local embedding store (creates `store.db`):
+
+```powershell
+python .\agent.py --ingest .\docs
+```
+
 - Query using local docs as context:
 
 ```powershell
 python .\agent.py --query "how do I make a quick tomato pasta?" --topk 3
-```
-
-- Use the REPL (supports `/ingest` and `/query`, plus caching for repeated prompts):
-
-```powershell
-python .\agent.py --interactive
-# inside REPL:
-# /ingest docs
-# /query best quick dinners
-# /recipe eggs, milk, cheese
 ```
 
 - Run tests:
@@ -79,15 +119,20 @@ python .\agent.py --interactive
 pytest -q
 ```
 
-Notes about persistence and caching
+Persistence and caching notes
 
-- The embedding store persists into `store.db` (SQLite). Ingested markdown files create per-chunk embeddings and are used for retrieval.
-- Chat completions are cached in the same database to reduce repeated API calls for identical prompts.
+- The embedding store persists into `store.db` (SQLite). Ingested markdown files are chunked and stored for retrieval.
+- Chat completions may be cached to reduce repeated API calls for identical prompts.
 
 Optional Faiss indexing
 
-- If you install `faiss-cpu` (listed in `requirements.txt`), the embedding store will build an internal Faiss index for faster nearest-neighbor retrieval. If Faiss is not available, the store falls back to a SQLite-backed brute-force search.
+- Installing `faiss-cpu` (if desired) enables a Faiss index for faster nearest-neighbor retrieval. Without Faiss, the store falls back to a SQLite-backed search.
 
-PR automation
+CI / PR automation
 
-- Push to a branch matching `feature/*` and the workflow `.github/workflows/create-pr.yml` will automatically open a pull request against `main` using the repository's GitHub token.
+- Follow the repository's branching conventions (for example, `feature/*`) to trigger existing automation workflows.
+
+License
+
+This repository does not include a license file. Add a `LICENSE` to define project licensing.
+
