@@ -48,3 +48,46 @@ Next steps I can do for you
 - Add Windows installer script or publish to PyPI
 
 If you'd like any of those, tell me which one and I'll continue.
+
+Ingesting docs, persistence, and tests
+
+- To ingest markdown docs into the local embedding store (creates `store.db`):
+
+```powershell
+python .\agent.py --ingest .\docs
+```
+
+- Query using local docs as context:
+
+```powershell
+python .\agent.py --query "how do I make a quick tomato pasta?" --topk 3
+```
+
+- Use the REPL (supports `/ingest` and `/query`, plus caching for repeated prompts):
+
+```powershell
+python .\agent.py --interactive
+# inside REPL:
+# /ingest docs
+# /query best quick dinners
+# /recipe eggs, milk, cheese
+```
+
+- Run tests:
+
+```powershell
+pytest -q
+```
+
+Notes about persistence and caching
+
+- The embedding store persists into `store.db` (SQLite). Ingested markdown files create per-chunk embeddings and are used for retrieval.
+- Chat completions are cached in the same database to reduce repeated API calls for identical prompts.
+
+Optional Faiss indexing
+
+- If you install `faiss-cpu` (listed in `requirements.txt`), the embedding store will build an internal Faiss index for faster nearest-neighbor retrieval. If Faiss is not available, the store falls back to a SQLite-backed brute-force search.
+
+PR automation
+
+- Push to a branch matching `feature/*` and the workflow `.github/workflows/create-pr.yml` will automatically open a pull request against `main` using the repository's GitHub token.

@@ -1,0 +1,35 @@
+[
+  {
+    "title": "Tomato Pasta",
+    "ingredients": ["pasta", "tomatoes", "garlic", "olive oil", "salt", "pepper"],
+    "steps": [
+      "Cook pasta according to package instructions.",
+      "Sauté garlic in olive oil, add chopped tomatoes and simmer.",
+      "Toss pasta with sauce, season with salt and pepper, serve."
+    ],
+    "time_minutes": 25,
+    "tags": ["vegetarian", "quick"]
+  },
+  {
+    "title": "Quick Omelette",
+    "ingredients": ["eggs", "butter", "salt", "pepper"],
+    "steps": [
+      "Beat eggs with salt and pepper.",
+      "Heat butter in a pan and pour eggs, cook until set.",
+      "Fold and serve hot."
+    ],
+    "time_minutes": 10,
+    "tags": ["breakfast", "quick"]
+  },
+  {
+    "title": "Chickpea Salad",
+    "ingredients": ["canned chickpeas", "tomato", "cucumber", "olive oil", "lemon", "salt"],
+    "steps": [
+      "Drain and rinse chickpeas.",
+      "Chop tomato and cucumber and combine with chickpeas.",
+      "Dress with olive oil, lemon, and salt."
+    ],
+    "time_minutes": 10,
+    "tags": ["vegan", "salad"]
+  }
+]

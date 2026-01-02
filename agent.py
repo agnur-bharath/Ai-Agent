@@ -2,6 +2,8 @@ import os
 import argparse
 import sys
 import json
+import hashlib
+import time
 
 from dotenv import load_dotenv
 import openai
@@ -19,6 +21,7 @@ SYSTEM_PROMPT = (
     "based on available ingredients and any supporting documents provided. When context is available, cite the source IDs. "
     "Keep responses concise and actionable."
 )
+from utils import retry_openai
 
 DEFAULT_MODEL = "gpt-3.5-turbo"
 
@@ -44,6 +47,35 @@ def call_chat(prompt, model=DEFAULT_MODEL, temperature=0.7, max_tokens=600):
             max_tokens=max_tokens,
         )
         return response.choices[0].message.content.strip()
+    except Exception as e:
+        console.print(f"[red]API error:[/red] {e}")
+        return None
+
+
+def cached_call_chat(prompt, model=DEFAULT_MODEL, temperature=0.7, max_tokens=600, store: EmbeddingStore = None):
+    key = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    if store:
+        cached = store.get_cache(key)
+        if cached:
+            return cached
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens,
+
+        )
+        answer = response.choices[0].message.content.strip()
+        if store:
+            try:
+                store.set_cache(key, answer)
+            except Exception:
+                pass
+        return answer
     except Exception as e:
         console.print(f"[red]API error:[/red] {e}")
         return None
@@ -85,14 +117,12 @@ def interactive_loop(model, store=None, top_k=3):
             d = user[len("/ingest "):].strip()
             store = EmbeddingStore()
             store.ingest_dir(d)
-            store.save()
             console.print(f"Ingested docs from {d} into {store.path}")
             continue
         elif user.startswith("/query "):
             q = user[len("/query "):].strip()
             if not store:
                 store = EmbeddingStore()
-                store.load()
             ctx = store.query(q, top_k=top_k)
             ctx_text = "\n\n".join([f"Source:{c['id']}\n{c['text']}" for c in ctx])
             prompt = f"Use the following context documents to answer the question.\n\n{ctx_text}\n\nQuestion: {q}\n\nAnswer concisely and cite source IDs when relevant."
@@ -101,7 +131,7 @@ def interactive_loop(model, store=None, top_k=3):
             prompt = f"User input: {user}\n\nAct as a recipe recommender and provide helpful suggestions."
 
         console.print("[grey]Thinking...[/grey]")
-        answer = call_chat(prompt, model=model)
+        answer = cached_call_chat(prompt, model=model, store=store)
         if answer:
             console.print(Panel(answer, title="PantryChef"))
             history.append((user, answer))
@@ -124,18 +154,17 @@ def cli_main():
     if args.ingest:
         store = EmbeddingStore()
         store.ingest_dir(args.ingest)
-        store.save()
         console.print(f"Ingested docs from {args.ingest} into {store.path}")
         return
 
     if args.query:
         store = EmbeddingStore()
-        store.load()
         ctx = store.query(args.query, top_k=args.topk)
         ctx_text = "\n\n".join([f"Source:{c['id']}\n{c['text']}" for c in ctx])
         prompt = f"Use the following context documents to answer the question.\n\n{ctx_text}\n\nQuestion: {args.query}\n\nAnswer concisely and cite source IDs when relevant."
         console.print("[grey]Querying agent with local context...[/grey]")
-        answer = call_chat(prompt, model=args.model)
+        store_local = store
+        answer = cached_call_chat(prompt, model=args.model, store=store_local)
         if answer:
             console.print(Panel(answer, title="PantryChef"))
         return
@@ -144,7 +173,6 @@ def cli_main():
         # try to load store, but not required
         try:
             store = EmbeddingStore()
-            store.load()
         except Exception:
             store = None
         interactive_loop(args.model, store=store, top_k=args.topk)
