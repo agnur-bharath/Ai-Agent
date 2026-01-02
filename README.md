@@ -73,8 +73,3 @@ Optional Faiss indexing
 CI / PR automation
 
 - Follow the repository's branching conventions (for example, `feature/*`) to trigger existing automation workflows.
-
-License
-
-This repository does not include a license file. Add a `LICENSE` to define project licensing.
-
